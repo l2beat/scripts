@@ -14,6 +14,7 @@ export class EventProcessor {
   ) {}
 
   async processEvent(event: Event) {
+    console.log(event)
     const nameHash = (event.args?.name as { hash: string }).hash
     const newAddress = EthereumAddress(event.args?.newAddress as string)
     const [timestamp, name, implementationName] = await Promise.all([

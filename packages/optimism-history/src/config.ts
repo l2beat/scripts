@@ -20,4 +20,8 @@ export const config: Record<string, NetworkConfig | undefined> = {
     addressManager: '0x7934915C03eA2E2C4D69c269F45598B738ddee08',
     fromBlock: 13308621,
   },
+  zora: {
+    addressManager: '0xEF8115F2733fb2033a7c756402Fc1deaa56550Ef',
+    fromBlock: 7473931,
+  },
 }
