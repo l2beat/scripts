@@ -1,4 +1,4 @@
-import { BufferReader } from '@loopx/bufio'
+import { BufferReader } from 'bufio'
 import { ethers } from 'ethers'
 import zlib from 'zlib'
 
