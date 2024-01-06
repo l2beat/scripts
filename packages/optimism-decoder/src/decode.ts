@@ -1,3 +1,8 @@
+/* eslint-disable @typescript-eslint/no-unsafe-argument */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
+/* eslint-disable @typescript-eslint/no-unsafe-call */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+import assert from 'assert'
 import { BufferReader } from 'bufio'
 import { ethers } from 'ethers'
 import zlib from 'zlib'
@@ -23,7 +28,7 @@ export async function decodeSequencerBatch(
   kind: string,
   data: string,
   fourBytesApi: FourBytesApi,
-): Promise<AppendSequencerBatchParams> {
+): Promise<AppendSequencerBatchParams | undefined> {
   console.log('Decoding', kind, 'L1 Sequencer transaction batch ...')
   let reader = new BufferReader(Buffer.from(data.slice(2), 'hex'))
 
@@ -36,9 +41,15 @@ export async function decodeSequencerBatch(
     console.log('Frame Number:', frame_number)
     const frame_data_length = reader.readU32BE()
     console.log('Frame Data Length:', frame_data_length)
-    console.log(reader.left())
-    const bytes = reader.readBytes(reader.left() - 1)
+    // console.log(reader.left())
+    const bytes = reader.readBytes(frame_data_length)
+    const is_last = reader.readBytes(1).toString('hex')
+    assert(is_last === '01' || is_last === '00')
+    console.log('Is Last:', is_last === '01')
     const inflated = zlib.inflateSync(bytes)
+
+    // ----- reading decompressed data -----
+
     reader = new BufferReader(inflated)
     const decompressedBytes = reader.readBytes(reader.left())
     console.log(add0x(decompressedBytes.toString('hex')))
