@@ -6,6 +6,7 @@ const ctcMapping: Record<string, string | undefined> = {
   '0x56a76bcC92361f6DF8D75476feD8843EdC70e1C9': 'Metis',
   '0x6A1DB7d799FBA381F2a518cA859ED30cB8E1d41a': 'Metis 2.0',
   '0xfBd2541e316948B259264c02f370eD088E04c3Db': 'Boba Network',
+  '0x5f7f7f6DB967F0ef10BdA0678964DBA185d16c50': 'Lyra',
 }
 
 export async function analyzeTransaction(
@@ -14,6 +15,7 @@ export async function analyzeTransaction(
 ) {
   const tx = await provider.getTransaction(txHash)
   const project = ctcMapping[tx.to ?? ''] ?? 'Unknown'
+  console.log('Tx submits data to', tx.to, 'hence it is', project)
 
   return {
     data: tx.data,
