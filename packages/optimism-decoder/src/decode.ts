@@ -9,6 +9,7 @@ import zlib from 'zlib'
 
 import { FourBytesApi } from './FourBytesApi'
 import { add0x, trimLong } from './utils'
+import { decode } from 'punycode'
 
 interface BatchContext {
   sequencerTxCount: number
@@ -52,12 +53,40 @@ export async function decodeSequencerBatch(
 
     reader = new BufferReader(inflated)
     const decompressedBytes = reader.readBytes(reader.left())
-    console.log(add0x(decompressedBytes.toString('hex')))
-    const decoded = ethers.utils.RLP.decode(
-      // TODO: why this is failing ????
-      add0x(decompressedBytes.toString('hex')),
-    )
-    console.log(decoded)
+    // console.log(add0x(decompressedBytes.toString('hex')))
+
+    const totalLength = decompressedBytes.toString('hex').length / 2 // we do /2 because we are counting bytes
+    const lengthBytes = ethers.utils.hexlify(totalLength).slice(2)
+    console.log('Length Bytes:', lengthBytes)
+    const lengthBytesLength = lengthBytes.length / 2
+    console.log('Length Bytes Length:', lengthBytesLength)
+    const lengthByte = 0xf7 + lengthBytesLength
+    console.log('Length Byte:', lengthByte)
+    const lengthByteHex = ethers.utils.hexlify(lengthByte)
+    console.log('Length Byte Hex:', lengthByteHex)
+    const concatenatedWithLength =
+      lengthByteHex +
+      lengthBytes +
+      (decompressedBytes.toString('hex') as string)
+    //console.log(concatenatedWithLength)
+    const decoded = ethers.utils.RLP.decode(concatenatedWithLength)
+    //console.log(decoded)
+
+    const batches = []
+    for (const batch of decoded) {
+      const batchHexWithout00 = batch.slice(4)
+      const decodedBatch = ethers.utils.RLP.decode(add0x(batchHexWithout00))
+
+      if (decodedBatch[decodedBatch.length - 1].length !== 0) {
+        const txs = decodedBatch[decodedBatch.length - 1][0]
+        //console.log('txs:', txs)
+        const transactions = ethers.utils.RLP.decode(add0x(txs.slice(4)))
+        //console.log('transactions:', transactions)
+        decodedBatch[decodedBatch.length - 1] = transactions
+      }
+      batches.push(decodedBatch)
+    }
+    console.log(batches[0])
   } else {
     const methodName = reader.readBytes(4).toString('hex')
     console.log('MethodName:', methodName)
