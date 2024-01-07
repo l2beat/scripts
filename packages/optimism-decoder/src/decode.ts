@@ -65,17 +65,19 @@ export async function decodeOpStackSequencerBatch(
 
   for (const [index, batch] of decoded.entries()) {
     // batch: batch_version ++ rlp (parent_hash, epoch_number, epoch_hash, timestamp, transaction_list)
-    const batchVersion = batch.slice(2, 4)
     const decodedBatch = ethers.utils.RLP.decode(add0x(batch.slice(4)))
     const numTxs = decodedBatch[decodedBatch.length - 1].length
     if (numTxs !== 0) {
       // transaction list is not empty
       console.log()
       console.log('Batch #', index, 'with', numTxs, 'transactions')
-      console.log(decodedBatch)
+      console.log('ParentHash', decodedBatch[0])
+      console.log('EpochNumber', parseInt(decodedBatch[1], 16))
+      console.log('TimeStamp', parseInt(decodedBatch[2], 16))
+      console.log('EpochHash', decodedBatch[3])
 
       for (const tx of decodedBatch[decodedBatch.length - 1]) {
-        console.log('tx:', tx)
+        //console.log('tx:', tx)
         const parsed = ethers.utils.parseTransaction(tx)
         const methodHash = parsed.data.slice(0, 10)
         const methodSignature = await fourBytesApi.getMethodSignature(
