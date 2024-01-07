@@ -73,8 +73,8 @@ export async function decodeOpStackSequencerBatch(
       console.log('Batch #', index, 'with', numTxs, 'transactions')
       console.log('ParentHash', decodedBatch[0])
       console.log('EpochNumber', parseInt(decodedBatch[1], 16))
-      console.log('TimeStamp', parseInt(decodedBatch[2], 16))
-      console.log('EpochHash', decodedBatch[3])
+      console.log('EpochHash', decodedBatch[2])
+      console.log('Timestamp', parseInt(decodedBatch[3], 16))
 
       for (const tx of decodedBatch[decodedBatch.length - 1]) {
         //console.log('tx:', tx)
