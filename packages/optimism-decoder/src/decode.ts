@@ -27,6 +27,7 @@ interface AppendSequencerBatchParams {
 export async function decodeOpStackSequencerBatch(
   kind: string,
   data: string,
+  submissionTimestamp: number,
   fourBytesApi: FourBytesApi,
 ) {
   console.log('Decoding', kind, 'L1 Sequencer transaction batch ...')
@@ -91,7 +92,13 @@ export async function decodeOpStackSequencerBatch(
     } else numEmptyBatches++
   }
   console.log('Num of empty batches', numEmptyBatches)
-  console.log(timestamps)
+  console.log(
+    'Finality delay between',
+    submissionTimestamp - Math.min(...timestamps),
+    'and',
+    submissionTimestamp - Math.max(...timestamps),
+    'seconds',
+  )
 }
 
 export async function decodeSequencerBatch(

@@ -8,11 +8,13 @@ const ctcMapping: Record<string, string | undefined> = {
   '0xfBd2541e316948B259264c02f370eD088E04c3Db': 'Boba Network',
   '0x5f7f7f6DB967F0ef10BdA0678964DBA185d16c50': 'Lyra',
   '0xFf00000000000000000000000000000000008453': 'Base',
+  '0x6F54Ca6F6EdE96662024Ffd61BFd18f3f4e34DFf': 'Zora',
 }
 
 const typeMapping: Record<string, string | undefined> = {
   Lyra: 'OpStack',
   Base: 'OpStack',
+  Zora: 'OpStack',
   'Boba Network': 'OVM 2.0',
   'Optimism OVM 1.0': 'OVM 1.0',
 }

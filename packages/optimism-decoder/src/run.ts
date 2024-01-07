@@ -44,7 +44,7 @@ export async function run() {
     txHash,
   )
   if (kind === 'OpStack') {
-    await decodeOpStackSequencerBatch(project, data, fourBytesApi)
+    await decodeOpStackSequencerBatch(project, data, timestamp, fourBytesApi)
     console.log('Batch submission timestamp:', timestamp)
   } else await decodeSequencerBatch(project, data, fourBytesApi)
 }
