@@ -39,8 +39,12 @@ export async function run() {
   const provider = new ethers.providers.JsonRpcProvider(rpcUrl)
   const fourBytesApi = new FourBytesApi()
 
-  const { data, project, kind } = await analyzeTransaction(provider, txHash)
-  if (kind === 'OpStack')
+  const { data, timestamp, project, kind } = await analyzeTransaction(
+    provider,
+    txHash,
+  )
+  if (kind === 'OpStack') {
     await decodeOpStackSequencerBatch(project, data, fourBytesApi)
-  else await decodeSequencerBatch(project, data, fourBytesApi)
+    console.log('Batch submission timestamp:', timestamp)
+  } else await decodeSequencerBatch(project, data, fourBytesApi)
 }

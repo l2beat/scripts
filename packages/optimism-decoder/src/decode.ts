@@ -63,6 +63,7 @@ export async function decodeOpStackSequencerBatch(
   let numEmptyBatches = 0
   console.log('Decoding', decoded.length, 'batches')
 
+  const timestamps = []
   for (const [index, batch] of decoded.entries()) {
     // batch: batch_version ++ rlp (parent_hash, epoch_number, epoch_hash, timestamp, transaction_list)
     const decodedBatch = ethers.utils.RLP.decode(add0x(batch.slice(4)))
@@ -74,7 +75,9 @@ export async function decodeOpStackSequencerBatch(
       console.log('ParentHash', decodedBatch[0])
       console.log('EpochNumber', parseInt(decodedBatch[1], 16))
       console.log('EpochHash', decodedBatch[2])
-      console.log('Timestamp', parseInt(decodedBatch[3], 16))
+      const timestamp = parseInt(decodedBatch[3], 16)
+      console.log('Timestamp', timestamp)
+      timestamps.push(timestamp)
 
       for (const tx of decodedBatch[decodedBatch.length - 1]) {
         //console.log('tx:', tx)
@@ -88,6 +91,7 @@ export async function decodeOpStackSequencerBatch(
     } else numEmptyBatches++
   }
   console.log('Num of empty batches', numEmptyBatches)
+  console.log(timestamps)
 }
 
 export async function decodeSequencerBatch(

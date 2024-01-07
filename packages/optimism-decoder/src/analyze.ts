@@ -22,6 +22,7 @@ export async function analyzeTransaction(
   txHash: string,
 ) {
   const tx = await provider.getTransaction(txHash)
+  const block = await provider.getBlock(tx.blockNumber)
   const project = ctcMapping[tx.to ?? ''] ?? 'Unknown'
   const kind = typeMapping[project ?? ''] ?? 'Unknown'
   console.log(
@@ -35,6 +36,7 @@ export async function analyzeTransaction(
 
   return {
     data: tx.data,
+    timestamp: block.timestamp,
     project,
     kind,
   }
