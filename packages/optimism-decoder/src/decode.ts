@@ -25,11 +25,11 @@ interface AppendSequencerBatchParams {
   transactions: string[] // total_size_bytes[], total_size_bytes[]
 }
 
-export async function decodeSequencerBatch(
+export async function decodeOpStackSequencerBatch(
   kind: string,
   data: string,
   fourBytesApi: FourBytesApi,
-): Promise<AppendSequencerBatchParams | undefined> {
+) {
   console.log('Decoding', kind, 'L1 Sequencer transaction batch ...')
   let reader = new BufferReader(Buffer.from(data.slice(2), 'hex'))
 
@@ -73,6 +73,7 @@ export async function decodeSequencerBatch(
     //console.log(decoded)
 
     const batches = []
+    console.log('Decoding', decoded.length, 'batches')
     for (const batch of decoded) {
       const batchHexWithout00 = batch.slice(4)
       const decodedBatch = ethers.utils.RLP.decode(add0x(batchHexWithout00))
@@ -86,67 +87,69 @@ export async function decodeSequencerBatch(
       }
       batches.push(decodedBatch)
     }
-    console.log(batches[0])
-  } else {
-    const methodName = reader.readBytes(4).toString('hex')
-    console.log('MethodName:', methodName)
+    console.log('First batch', batches[0])
+  }
+}
 
-    if (kind === 'Metis' || kind === 'Metis 2.0') {
-      const chainId = reader.readBytes(32).toString('hex')
-      console.log('ChainId:', chainId)
-    }
-    const shouldStartAtElement = reader.readU40BE()
-    const totalElementsToAppend = reader.readU24BE()
-    const contextCount = reader.readU24BE()
+export async function decodeSequencerBatch(
+  kind: string,
+  data: string,
+  fourBytesApi: FourBytesApi,
+): Promise<AppendSequencerBatchParams | undefined> {
+  console.log('Decoding', kind, 'L1 Sequencer transaction batch ...')
+  let reader = new BufferReader(Buffer.from(data.slice(2), 'hex'))
 
-    console.log('Should start at Element:', shouldStartAtElement)
-    console.log('Total Elements to Append:', totalElementsToAppend)
-    console.log('contextCount:', contextCount)
+  const methodName = reader.readBytes(4).toString('hex')
+  console.log('MethodName:', methodName)
 
-    const contexts = []
-    for (let i = 0; i < contextCount; i++) {
-      const sequencerTxCount = reader.readU24BE()
-      const queueTxCount = reader.readU24BE()
-      const timestamp = reader.readU40BE()
-      const blockNumber = reader.readU40BE()
-      contexts.push({
-        sequencerTxCount,
-        queueTxCount,
-        timestamp,
-        blockNumber,
-      })
-      console.log(sequencerTxCount, queueTxCount, timestamp, blockNumber)
-    }
+  if (kind === 'Metis' || kind === 'Metis 2.0') {
+    const chainId = reader.readBytes(32).toString('hex')
+    console.log('ChainId:', chainId)
+  }
+  const shouldStartAtElement = reader.readU40BE()
+  const totalElementsToAppend = reader.readU24BE()
+  const contextCount = reader.readU24BE()
 
-    if (contexts[0].blockNumber === 0 && kind === 'Optimism OVM 2.0') {
-      console.log(
-        'Block number = 0 ? Transactions are compressed, nice.... Decompressing....',
-      )
-      contexts.slice(1) // remove dummy context that indicates compressed transaction data
-      const bytes = reader.readBytes(reader.left())
-      const inflated = zlib.inflateSync(bytes)
-      reader = new BufferReader(inflated)
-    }
+  console.log('Should start at Element:', shouldStartAtElement)
+  console.log('Total Elements to Append:', totalElementsToAppend)
+  console.log('contextCount:', contextCount)
 
-    const transactions = []
-    for (const context of contexts) {
-      console.log(
-        'Block:',
-        context.blockNumber,
-        'Timestamp:',
-        context.timestamp,
-      )
-      for (let i = 0; i < context.sequencerTxCount; i++) {
-        const size = reader.readU24BE()
-        const raw = reader.readBytes(size).toString('hex')
-        const parsed = ethers.utils.parseTransaction(add0x(raw))
-        const methodHash = parsed.data.slice(0, 10)
-        const methodSignature = await fourBytesApi.getMethodSignature(
-          methodHash,
-        )
-        transactions.push(add0x(raw))
-        console.log('  ', trimLong(add0x(raw)), methodHash, methodSignature)
-      }
+  const contexts = []
+  for (let i = 0; i < contextCount; i++) {
+    const sequencerTxCount = reader.readU24BE()
+    const queueTxCount = reader.readU24BE()
+    const timestamp = reader.readU40BE()
+    const blockNumber = reader.readU40BE()
+    contexts.push({
+      sequencerTxCount,
+      queueTxCount,
+      timestamp,
+      blockNumber,
+    })
+    console.log(sequencerTxCount, queueTxCount, timestamp, blockNumber)
+  }
+
+  if (contexts[0].blockNumber === 0 && kind === 'Optimism OVM 2.0') {
+    console.log(
+      'Block number = 0 ? Transactions are compressed, nice.... Decompressing....',
+    )
+    contexts.slice(1) // remove dummy context that indicates compressed transaction data
+    const bytes = reader.readBytes(reader.left())
+    const inflated = zlib.inflateSync(bytes)
+    reader = new BufferReader(inflated)
+  }
+
+  const transactions = []
+  for (const context of contexts) {
+    console.log('Block:', context.blockNumber, 'Timestamp:', context.timestamp)
+    for (let i = 0; i < context.sequencerTxCount; i++) {
+      const size = reader.readU24BE()
+      const raw = reader.readBytes(size).toString('hex')
+      const parsed = ethers.utils.parseTransaction(add0x(raw))
+      const methodHash = parsed.data.slice(0, 10)
+      const methodSignature = await fourBytesApi.getMethodSignature(methodHash)
+      transactions.push(add0x(raw))
+      console.log('  ', trimLong(add0x(raw)), methodHash, methodSignature)
     }
 
     console.log('Decoded', transactions.length, 'transactions')

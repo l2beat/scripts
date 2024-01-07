@@ -9,16 +9,31 @@ const ctcMapping: Record<string, string | undefined> = {
   '0x5f7f7f6DB967F0ef10BdA0678964DBA185d16c50': 'Lyra',
 }
 
+const typeMapping: Record<string, string | undefined> = {
+  'Lyra': 'OpStack',
+  'Boba Network': 'OVM 2.0',
+  'Optimism OVM 1.0': 'OVM 1.0',
+}
+
 export async function analyzeTransaction(
   provider: providers.Provider,
   txHash: string,
 ) {
   const tx = await provider.getTransaction(txHash)
   const project = ctcMapping[tx.to ?? ''] ?? 'Unknown'
-  console.log('Tx submits data to', tx.to, 'hence it is', project)
+  const kind = typeMapping[project ?? ''] ?? 'Unknown'
+  console.log(
+    'Tx submits data to',
+    tx.to,
+    'hence it is',
+    project,
+    'of kind',
+    kind,
+  )
 
   return {
     data: tx.data,
     project,
+    kind,
   }
 }
