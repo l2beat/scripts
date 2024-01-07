@@ -32,87 +32,60 @@ export async function decodeOpStackSequencerBatch(
   console.log('Decoding', kind, 'L1 Sequencer transaction batch ...')
   let reader = new BufferReader(Buffer.from(data.slice(2), 'hex'))
 
-  if (kind === 'Lyra') {
-    const version = reader.readBytes(1).toString('hex')
-    console.log('Version:', version)
-    const channelId = reader.readBytes(16).toString('hex')
-    console.log('ChannelId:', channelId)
-    const frame_number = reader.readU16BE()
-    console.log('Frame Number:', frame_number)
-    const frame_data_length = reader.readU32BE()
-    console.log('Frame Data Length:', frame_data_length)
-    // console.log(reader.left())
-    const bytes = reader.readBytes(frame_data_length)
-    const is_last = reader.readBytes(1).toString('hex')
-    assert(is_last === '01' || is_last === '00')
-    console.log('Is Last:', is_last === '01')
-    const inflated = zlib.inflateSync(bytes)
+  const version = reader.readBytes(1).toString('hex')
+  console.log('Version:', version)
+  const channelId = reader.readBytes(16).toString('hex')
+  console.log('ChannelId:', channelId)
+  const frame_number = reader.readU16BE()
+  console.log('Frame Number:', frame_number)
+  const frame_data_length = reader.readU32BE()
+  console.log('Frame Data Length:', frame_data_length)
+  // console.log(reader.left())
+  const bytes = reader.readBytes(frame_data_length)
+  const is_last = reader.readBytes(1).toString('hex')
+  assert(is_last === '01' || is_last === '00')
+  console.log('Is Last:', is_last === '01')
+  const inflated = zlib.inflateSync(bytes)
 
-    // ----- reading decompressed data -----
+  // ----- reading decompressed data -----
 
-    reader = new BufferReader(inflated)
-    const decompressedBytes = reader.readBytes(reader.left())
-    // console.log(add0x(decompressedBytes.toString('hex')))
+  reader = new BufferReader(inflated)
+  const decompressedBytes = reader.readBytes(reader.left())
+  const totalLength = decompressedBytes.toString('hex').length / 2 // we do /2 because we are counting bytes
+  const lengthBytes = ethers.utils.hexlify(totalLength).slice(2)
+  const lengthBytesLength = lengthBytes.length / 2
+  const lengthByte = 0xf7 + lengthBytesLength
+  const lengthByteHex = ethers.utils.hexlify(lengthByte)
+  const concatenatedWithLength =
+    lengthByteHex + lengthBytes + (decompressedBytes.toString('hex') as string)
+  const decoded = ethers.utils.RLP.decode(concatenatedWithLength)
 
-    const totalLength = decompressedBytes.toString('hex').length / 2 // we do /2 because we are counting bytes
-    const lengthBytes = ethers.utils.hexlify(totalLength).slice(2)
-    console.log('Length Bytes:', lengthBytes)
-    const lengthBytesLength = lengthBytes.length / 2
-    console.log('Length Bytes Length:', lengthBytesLength)
-    const lengthByte = 0xf7 + lengthBytesLength
-    console.log('Length Byte:', lengthByte)
-    const lengthByteHex = ethers.utils.hexlify(lengthByte)
-    console.log('Length Byte Hex:', lengthByteHex)
-    const concatenatedWithLength =
-      lengthByteHex +
-      lengthBytes +
-      (decompressedBytes.toString('hex') as string)
-    //console.log(concatenatedWithLength)
-    const decoded = ethers.utils.RLP.decode(concatenatedWithLength)
-    //console.log(decoded)
+  let numEmptyBatches = 0
+  console.log('Decoding', decoded.length, 'batches')
 
-    const batches = []
-    let numEmptyBatches = 0
-    console.log('Decoding', decoded.length, 'batches')
-    for (const [index, batch] of decoded.entries()) {
-      const batchHexWithout00 = batch.slice(4) // remove '0x00' from the beginning of a batch. 00 signifies batch version number
-      const decodedBatch = ethers.utils.RLP.decode(add0x(batchHexWithout00))
-      // decoded batch is [parent_hash, epoch_number, epoch_hash, timestamp, transaction_list]
+  for (const [index, batch] of decoded.entries()) {
+    // batch: batch_version ++ rlp (parent_hash, epoch_number, epoch_hash, timestamp, transaction_list)
+    const batchVersion = batch.slice(2, 4)
+    const decodedBatch = ethers.utils.RLP.decode(add0x(batch.slice(4)))
+    const numTxs = decodedBatch[decodedBatch.length - 1].length
+    if (numTxs !== 0) {
+      // transaction list is not empty
+      console.log()
+      console.log('Batch #', index, 'with', numTxs, 'transactions')
+      console.log(decodedBatch)
 
-      if (decodedBatch[decodedBatch.length - 1].length !== 0) {
-        // transaction list is not empty
-        //console.log(batch)
-        console.log()
-        console.log('Batch #', index)
-
-        const txs = decodedBatch[decodedBatch.length - 1][0]
-        //console.log('txs:', txs)
-        const transaction = ethers.utils.RLP.decode(add0x(txs.slice(4))) //rlp([nonce, gasPrice, gasLimit, to, value, data, v, r, s])
-        console.log('RLP Decoded transaction:')
-        console.log(' ChainId:', parseInt(transaction[0], 16))
-        console.log(' SenderNonce:', parseInt(transaction[1], 16))
-        console.log(' max_priority_fee_per_gas:', parseInt(transaction[2], 16))
-        console.log(' max_fee_per_gas:', parseInt(transaction[3], 16))
-        console.log(' gas_limit:', parseInt(transaction[4], 16))
-        console.log(' To:', transaction[5])
-        console.log(' Value:', transaction[6])
-        console.log(' Data:', transaction[7])
-        console.log(' AccessList:', transaction[8])
-        console.log(' V', transaction[9])
-        console.log(' R', transaction[10])
-        console.log(' S', transaction[11])
-        decodedBatch[decodedBatch.length - 1] = transaction
-      } else numEmptyBatches++
-      batches.push(decodedBatch)
-    }
-    console.log('Num of empty batches', numEmptyBatches)
-    console.log('First batch:')
-    console.log('  Parent_hash', batches[0][0])
-    console.log('  Epoch_number', batches[0][1])
-    console.log('  Epoch_hash', batches[0][2])
-    console.log('  Timestamp', batches[0][3])
-    console.log('  Tx_list', batches[0][4])
+      for (const tx of decodedBatch[decodedBatch.length - 1]) {
+        console.log('tx:', tx)
+        const parsed = ethers.utils.parseTransaction(tx)
+        const methodHash = parsed.data.slice(0, 10)
+        const methodSignature = await fourBytesApi.getMethodSignature(
+          methodHash,
+        )
+        console.log('  ', trimLong(tx), methodHash, methodSignature)
+      }
+    } else numEmptyBatches++
   }
+  console.log('Num of empty batches', numEmptyBatches)
 }
 
 export async function decodeSequencerBatch(
