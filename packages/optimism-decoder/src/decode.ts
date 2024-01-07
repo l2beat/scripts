@@ -9,7 +9,6 @@ import zlib from 'zlib'
 
 import { FourBytesApi } from './FourBytesApi'
 import { add0x, trimLong } from './utils'
-import { decode } from 'punycode'
 
 interface BatchContext {
   sequencerTxCount: number
@@ -73,21 +72,46 @@ export async function decodeOpStackSequencerBatch(
     //console.log(decoded)
 
     const batches = []
+    let numEmptyBatches = 0
     console.log('Decoding', decoded.length, 'batches')
-    for (const batch of decoded) {
-      const batchHexWithout00 = batch.slice(4)
+    for (const [index, batch] of decoded.entries()) {
+      const batchHexWithout00 = batch.slice(4) // remove '0x00' from the beginning of a batch. 00 signifies batch version number
       const decodedBatch = ethers.utils.RLP.decode(add0x(batchHexWithout00))
+      // decoded batch is [parent_hash, epoch_number, epoch_hash, timestamp, transaction_list]
 
       if (decodedBatch[decodedBatch.length - 1].length !== 0) {
+        // transaction list is not empty
+        //console.log(batch)
+        console.log()
+        console.log('Batch #', index)
+
         const txs = decodedBatch[decodedBatch.length - 1][0]
         //console.log('txs:', txs)
-        const transactions = ethers.utils.RLP.decode(add0x(txs.slice(4)))
-        //console.log('transactions:', transactions)
-        decodedBatch[decodedBatch.length - 1] = transactions
-      }
+        const transaction = ethers.utils.RLP.decode(add0x(txs.slice(4))) //rlp([nonce, gasPrice, gasLimit, to, value, data, v, r, s])
+        console.log('RLP Decoded transaction:')
+        console.log(' ChainId:', parseInt(transaction[0], 16))
+        console.log(' SenderNonce:', parseInt(transaction[1], 16))
+        console.log(' max_priority_fee_per_gas:', parseInt(transaction[2], 16))
+        console.log(' max_fee_per_gas:', parseInt(transaction[3], 16))
+        console.log(' gas_limit:', parseInt(transaction[4], 16))
+        console.log(' To:', transaction[5])
+        console.log(' Value:', transaction[6])
+        console.log(' Data:', transaction[7])
+        console.log(' AccessList:', transaction[8])
+        console.log(' V', transaction[9])
+        console.log(' R', transaction[10])
+        console.log(' S', transaction[11])
+        decodedBatch[decodedBatch.length - 1] = transaction
+      } else numEmptyBatches++
       batches.push(decodedBatch)
     }
-    console.log('First batch', batches[0])
+    console.log('Num of empty batches', numEmptyBatches)
+    console.log('First batch:')
+    console.log('  Parent_hash', batches[0][0])
+    console.log('  Epoch_number', batches[0][1])
+    console.log('  Epoch_hash', batches[0][2])
+    console.log('  Timestamp', batches[0][3])
+    console.log('  Tx_list', batches[0][4])
   }
 }
 
