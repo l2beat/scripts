@@ -39,6 +39,12 @@ export async function decodeOpStackSequencerBatch(
   console.log('ChannelId:', channelId)
   const frame_number = reader.readU16BE()
   console.log('Frame Number:', frame_number)
+  if (frame_number !== 0) {
+    console.log(
+      "This is not a first frame, I won't be able to decompress this, exiting...",
+    )
+    return
+  }
   const frame_data_length = reader.readU32BE()
   console.log('Frame Data Length:', frame_data_length)
   // console.log(reader.left())
@@ -46,6 +52,13 @@ export async function decodeOpStackSequencerBatch(
   const is_last = reader.readBytes(1).toString('hex')
   assert(is_last === '01' || is_last === '00')
   console.log('Is Last:', is_last === '01')
+  if (is_last === '00') {
+    console.log(
+      "This is not a last frame, I won't be able to decompress this, exiting...",
+    )
+    return
+  }
+
   const inflated = zlib.inflateSync(bytes)
 
   // ----- reading decompressed data -----
