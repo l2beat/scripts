@@ -24,6 +24,34 @@ interface AppendSequencerBatchParams {
   transactions: string[] // total_size_bytes[], total_size_bytes[]
 }
 
+export async function decodeArbitrumBatch(
+  kind: string,
+  data: string,
+  fourBytesApi: FourBytesApi,
+) {
+  console.log('Decoding Arbitrum...')
+  const abi = [
+    'function addSequencerL2BatchFromOrigin(uint256 sequenceNumber,bytes data,uint256 afterDelayedMessagesRead,address gasRefunder,uint256 prevMessageCount,uint256 newMessageCount)',
+  ]
+  const iface = new ethers.utils.Interface(abi)
+  const decodedArgs = iface.decodeFunctionData(data.slice(0, 10), data)
+  console.log(decodedArgs.data.slice(2, 4)) // removing 0x, next byte is type of compressed data
+  let brotliCompressedData = Buffer.from(data.slice(4), 'hex')
+  try {
+    let decompressedData = zlib.brotliDecompressSync(brotliCompressedData, {
+      //TODO: No idea what are the correct params
+      params: {
+        [zlib.constants.BROTLI_PARAM_MODE]: zlib.constants.BROTLI_MODE_GENERIC,
+        [zlib.constants.BROTLI_PARAM_QUALITY]:
+          zlib.constants.BROTLI_MAX_QUALITY,
+      },
+    })
+    console.log('Decompressed data:', decompressedData.toString())
+  } catch (err) {
+    console.error('An error occurred:', err)
+  }
+}
+
 export async function decodeOpStackSequencerBatch(
   kind: string,
   data: string,

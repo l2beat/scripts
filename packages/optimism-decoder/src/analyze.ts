@@ -11,10 +11,12 @@ const ctcMapping: Record<string, string | undefined> = {
   '0x6F54Ca6F6EdE96662024Ffd61BFd18f3f4e34DFf': 'Zora',
   '0xC1B90E1e459aBBDcEc4DCF90dA45ba077d83BFc5': 'PGN',
   '0xFF00000000000000000000000000000000000010': 'OPMainnet',
-  '0x253887577420Cb7e7418cD4d50147743c8041b28': 'Aevo'
+  '0x253887577420Cb7e7418cD4d50147743c8041b28': 'Aevo',
+  '0x1c479675ad559DC151F6Ec7ed3FbF8ceE79582B6': 'Arbitrum',
 }
 
 const typeMapping: Record<string, string | undefined> = {
+  Arbitrum: 'Arbitrum',
   Lyra: 'OpStack',
   Base: 'OpStack',
   Zora: 'OpStack',
