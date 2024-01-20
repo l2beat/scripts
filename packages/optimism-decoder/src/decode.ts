@@ -36,7 +36,7 @@ export async function decodeArbitrumBatch(
   const iface = new ethers.utils.Interface(abi)
   const decodedArgs = iface.decodeFunctionData(data.slice(0, 10), data)
   console.log(decodedArgs.data.slice(2, 4)) // removing 0x, next byte is type of compressed data
-  let brotliCompressedData = Buffer.from(data.slice(4), 'hex')
+  let brotliCompressedData = Buffer.from(decodedArgs.data.slice(4), 'hex')
   try {
     let decompressedData = zlib.brotliDecompressSync(brotliCompressedData, {
       //TODO: No idea what are the correct params
