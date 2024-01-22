@@ -9,6 +9,9 @@ import zlib from 'zlib'
 
 import { FourBytesApi } from './FourBytesApi'
 import { add0x, trimLong } from './utils'
+import { decode } from 'punycode'
+import { parse } from 'path'
+import { mnemonicToEntropy } from 'ethers/lib/utils'
 
 interface BatchContext {
   sequencerTxCount: number
@@ -23,12 +26,134 @@ interface AppendSequencerBatchParams {
   contexts: BatchContext[] // total_elements[fixed_size[]]
   transactions: string[] // total_size_bytes[], total_size_bytes[]
 }
+/*
 
-export async function decodeArbitrumBatch(
-  kind: string,
-  data: string,
+//4d73adb72bc3dd368966edd0f0b2148401a178e2
+
+86 038465ab8606
+86 04840122a208
+b9 0b77 0003000000000000027404f9027083597a5d8407270e00835ca96d94a0cc33dd6f4819d473226257792afe230ec3c67f80b902046c459a28
+000000000000000000000000
+4d73adb72bc3dd368966edd0f0b2148401a178e2
+00000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000000000065abda65
+*/
+
+/* 	L1MessageType_L2Message             = 3
+	L1MessageType_EndOfBlock            = 6
+	L1MessageType_L2FundedByL1          = 7
+	L1MessageType_RollupEvent           = 8
+	L1MessageType_SubmitRetryable       = 9
+	L1MessageType_BatchForGasEstimation = 10 // probably won't use this in practice
+	L1MessageType_Initialize            = 11
+	L1MessageType_EthDeposit            = 12
+	L1MessageType_BatchPostingReport    = 13
+	L1MessageType_Invalid               = 0xFF
+  /* 
+
+/* const BatchSegmentKindL2Message uint8 = 0
+const BatchSegmentKindL2MessageBrotli uint8 = 1
+const BatchSegmentKindDelayedMessages uint8 = 2
+const BatchSegmentKindAdvanceTimestamp uint8 = 3
+const BatchSegmentKindAdvanceL1BlockNumber uint8 = 4
+*/
+
+/* 	L2MessageKind_UnsignedUserTx  = 0
+	L2MessageKind_ContractTx      = 1
+	L2MessageKind_NonmutatingCall = 2
+	L2MessageKind_Batch           = 3
+	L2MessageKind_SignedTx        = 4
+	// 5 is reserved
+	L2MessageKind_Heartbeat          = 6 // deprecated
+	L2MessageKind_SignedCompressedTx = 7
+	// 8 is reserved for BLS signed batch
+) */
+
+export function decodeArbitrumL2Message(
+  tx: string,
   fourBytesApi: FourBytesApi,
 ) {
+  const type = tx.slice(0, 2)
+  //console.log('  Type:', type)
+  const rawTx = add0x(tx.slice(2))
+  const parsed = ethers.utils.parseTransaction(rawTx)
+  const methodHash = parsed.data.slice(0, 10)
+  // const methodSignature = await fourBytesApi.getMethodSignature(methodHash)
+  const methodSignature = '???'
+  //console.log(
+  //  '  ',
+  //  trimLong(tx),
+  //  methodHash,
+  //  methodSignature,
+  //  parsed.from,
+  //  parsed.to,
+  // )
+  //console.log(parsed.from, parsed.to)
+}
+
+export function decodeArbitrumL2MessageBatch(
+  l2Message: string,
+  fourBytesApi: FourBytesApi,
+) {
+  //console.log('decoding L2Message:')
+  //console.log(l2Message)
+  //console.log()
+  let totalRead = 0
+  for (let i = 0; ; i++) {
+    const length = parseInt(l2Message.slice(totalRead, totalRead + 16), 16) * 2
+    //console.log('  TxChunkLength:', i, +length)
+    const tx = l2Message.slice(totalRead + 16, totalRead + 16 + length)
+    //console.log(tx, tx.length)
+    //decodeArbitrumL2Message(tx, fourBytesApi)
+    totalRead += length + 16
+    //console.log('TotalRead: ', totalRead)
+    if (totalRead >= l2Message.length) break
+  }
+}
+
+export function decodeArbitrumSegment(
+  segment: string,
+  fourBytesApi: FourBytesApi,
+): string {
+  const segmentContentType = segment.slice(0, 2)
+  let timestamp = '0x00'
+  //console.log('SegmentContentType: ', segmentContentType)
+  switch (segmentContentType) {
+    case '00': // Batch of singed transactions
+      if (segment.slice(2, 4) === '03') {
+        decodeArbitrumL2MessageBatch(segment.slice(4), fourBytesApi)
+      } else {
+        const tx = segment.slice(4)
+        decodeArbitrumL2Message(add0x(tx), fourBytesApi)
+      }
+      break
+    case '03': // AdvanceTimestamp + 4 bytes
+      timestamp = ethers.utils.RLP.decode(add0x(segment.slice(2)))
+      //console.log('  AdvanceTimestamp:', timestamp, parseInt(timestamp, 16))
+      break
+    case '04': // AdvanceL1BlockNumber + 4 bytes
+      const l1block = ethers.utils.RLP.decode(add0x(segment.slice(2)))
+      //console.log('  AdvanceL1BlockNumber:', l1block, parseInt(l1block, 16))
+      break
+    default:
+      console.log(
+        'Unknown segment type',
+        segmentContentType,
+        segment.slice(4),
+        parseInt(segment.slice(4), 16),
+      )
+  }
+  return timestamp
+}
+
+export function decodeArbitrumBatch(
+  kind: string,
+  data: string,
+  submissionTimestamp: number,
+  fourBytesApi: FourBytesApi,
+) {
+  let minTimestamp, maxTimestamp, minT, maxT
+  let firstTimestamp = true
+
   console.log('Decoding Arbitrum...')
   const abi = [
     'function addSequencerL2BatchFromOrigin(uint256 sequenceNumber,bytes data,uint256 afterDelayedMessagesRead,address gasRefunder,uint256 prevMessageCount,uint256 newMessageCount)',
@@ -39,14 +164,60 @@ export async function decodeArbitrumBatch(
   let brotliCompressedData = Buffer.from(decodedArgs.data.slice(4), 'hex')
   try {
     let decompressedData = zlib.brotliDecompressSync(brotliCompressedData, {
-      //TODO: No idea what are the correct params
+      //TODO: No idea what are the correct params.
       params: {
         [zlib.constants.BROTLI_PARAM_MODE]: zlib.constants.BROTLI_MODE_GENERIC,
         [zlib.constants.BROTLI_PARAM_QUALITY]:
           zlib.constants.BROTLI_MAX_QUALITY,
       },
     })
-    console.log('Decompressed data:', decompressedData.toString())
+    //console.log('Decompressed data:', decompressedData)
+    let reader = new BufferReader(decompressedData)
+    //reader contains uncompressed list of segments. Each segment is RLP decoded.
+    for (let i = 0; i < 152; i++) {
+      //152
+      // read segment length
+      let segmentLength = 0
+      const lengthType = parseInt(reader.readBytes(1).toString('hex'), 16)
+      //console.log(lengthType)
+      if (lengthType >= 128 && lengthType <= 183) {
+        segmentLength = lengthType - 128
+      } else if (lengthType >= 184 && lengthType <= 191) {
+        // 0xb7 - 0xbf
+        const lenghtOflength = lengthType - 183
+        segmentLength = parseInt(
+          reader.readBytes(lenghtOflength).toString('hex'),
+          16,
+        )
+      } else {
+        console.log(reader.readBytes(1).toString('hex'))
+        break
+      }
+      //console.log('Segment', i, 'of length', segmentLength)
+      const value = reader.readBytes(segmentLength).toString('hex')
+      //console.log(value)
+
+      const timestamp = decodeArbitrumSegment(value, fourBytesApi)
+      if (firstTimestamp) {
+        minTimestamp = parseInt(timestamp, 16)
+        maxTimestamp = parseInt(timestamp, 16)
+        firstTimestamp = false
+      } else {
+        maxTimestamp += parseInt(timestamp, 16)
+      }
+      minT = minTimestamp
+      maxT = maxTimestamp
+    }
+    console.log('Submission timestamp:', submissionTimestamp)
+    console.log('Min L2 timestamp in submission:', minTimestamp)
+    console.log('Max L2 timestamp in submission:', maxTimestamp)
+    console.log(
+      'Finality delay between',
+      submissionTimestamp - minTimestamp,
+      'and',
+      submissionTimestamp - maxTimestamp,
+      'seconds',
+    )
   } catch (err) {
     console.error('An error occurred:', err)
   }
