@@ -2,7 +2,11 @@ import dotenv from 'dotenv'
 import { ethers } from 'ethers'
 
 import { analyzeTransaction } from './analyze'
-import { decodeSequencerBatch } from './decode'
+import {
+  decodeSequencerBatch,
+  decodeOpStackSequencerBatch,
+  decodeArbitrumBatch,
+} from './decode'
 import { FourBytesApi } from './FourBytesApi'
 
 function getEnv(key: string) {
@@ -39,6 +43,14 @@ export async function run() {
   const provider = new ethers.providers.JsonRpcProvider(rpcUrl)
   const fourBytesApi = new FourBytesApi()
 
-  const { data, project } = await analyzeTransaction(provider, txHash)
-  await decodeSequencerBatch(project, data, fourBytesApi)
+  const { data, timestamp, project, kind } = await analyzeTransaction(
+    provider,
+    txHash,
+  )
+  if (kind === 'OpStack') {
+    await decodeOpStackSequencerBatch(project, data, timestamp, fourBytesApi)
+    console.log('Batch submission timestamp:', timestamp)
+  } else if (kind === 'Arbitrum')
+    await decodeArbitrumBatch(project, data, timestamp, fourBytesApi)
+  else await decodeSequencerBatch(project, data, fourBytesApi)
 }
