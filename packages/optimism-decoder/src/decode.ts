@@ -12,6 +12,7 @@ import { add0x, trimLong } from './utils'
 import { decode } from 'punycode'
 import { parse } from 'path'
 import { mnemonicToEntropy } from 'ethers/lib/utils'
+import { exit } from 'process'
 
 interface BatchContext {
   sequencerTxCount: number
@@ -50,7 +51,10 @@ b9 0b77 0003000000000000027404f9027083597a5d8407270e00835ca96d94a0cc33dd6f4819d4
 	L1MessageType_Invalid               = 0xFF
   /* 
 
-/* const BatchSegmentKindL2Message uint8 = 0
+/* 
+ARBITRUM SEGMENT TYPES:
+
+const BatchSegmentKindL2Message uint8 = 0
 const BatchSegmentKindL2MessageBrotli uint8 = 1
 const BatchSegmentKindDelayedMessages uint8 = 2
 const BatchSegmentKindAdvanceTimestamp uint8 = 3
@@ -118,7 +122,7 @@ export function decodeArbitrumSegment(
   let timestamp = '0x00'
   //console.log('SegmentContentType: ', segmentContentType)
   switch (segmentContentType) {
-    case '00': // Batch of singed transactions
+    case '00': // Batch of signed transactions
       if (segment.slice(2, 4) === '03') {
         decodeArbitrumL2MessageBatch(segment.slice(4), fourBytesApi)
       } else {
@@ -151,7 +155,7 @@ export function decodeArbitrumBatch(
   submissionTimestamp: number,
   fourBytesApi: FourBytesApi,
 ) {
-  let minTimestamp, maxTimestamp, minT, maxT
+  let minTimestamp, maxTimestamp
   let firstTimestamp = true
 
   console.log('Decoding Arbitrum...')
@@ -173,31 +177,21 @@ export function decodeArbitrumBatch(
     })
     //console.log('Decompressed data:', decompressedData)
     let reader = new BufferReader(decompressedData)
-    //reader contains uncompressed list of segments. Each segment is RLP decoded.
-    for (let i = 0; i < 152; i++) {
-      //152
-      // read segment length
-      let segmentLength = 0
-      const lengthType = parseInt(reader.readBytes(1).toString('hex'), 16)
-      //console.log(lengthType)
-      if (lengthType >= 128 && lengthType <= 183) {
-        segmentLength = lengthType - 128
-      } else if (lengthType >= 184 && lengthType <= 191) {
-        // 0xb7 - 0xbf
-        const lenghtOflength = lengthType - 183
-        segmentLength = parseInt(
-          reader.readBytes(lenghtOflength).toString('hex'),
-          16,
-        )
-      } else {
-        console.log(reader.readBytes(1).toString('hex'))
-        break
-      }
-      //console.log('Segment', i, 'of length', segmentLength)
-      const value = reader.readBytes(segmentLength).toString('hex')
-      //console.log(value)
 
-      const timestamp = decodeArbitrumSegment(value, fourBytesApi)
+    const decompressedBytes = reader.readBytes(reader.left())
+    const totalLength = decompressedBytes.toString('hex').length / 2 // we do /2 because we are counting bytes
+    const lengthBytes = ethers.utils.hexlify(totalLength).slice(2)
+    const lengthBytesLength = lengthBytes.length / 2
+    const lengthByte = 0xf7 + lengthBytesLength
+    const lengthByteHex = ethers.utils.hexlify(lengthByte)
+    const concatenatedWithLength =
+      lengthByteHex +
+      lengthBytes +
+      (decompressedBytes.toString('hex') as string)
+    const decoded = ethers.utils.RLP.decode(concatenatedWithLength)
+    console.log('Decoded:', decoded.length)
+    for (const [index, value] of decoded.entries()) {
+      const timestamp = decodeArbitrumSegment(value.slice(2), fourBytesApi)
       if (firstTimestamp) {
         minTimestamp = parseInt(timestamp, 16)
         maxTimestamp = parseInt(timestamp, 16)
@@ -205,18 +199,22 @@ export function decodeArbitrumBatch(
       } else {
         maxTimestamp += parseInt(timestamp, 16)
       }
-      minT = minTimestamp
-      maxT = maxTimestamp
     }
     console.log('Submission timestamp:', submissionTimestamp)
     console.log('Min L2 timestamp in submission:', minTimestamp)
     console.log('Max L2 timestamp in submission:', maxTimestamp)
+    const minT = submissionTimestamp - minTimestamp
+    const maxT = submissionTimestamp - maxTimestamp
     console.log(
       'Finality delay between',
-      submissionTimestamp - minTimestamp,
+      minT,
       'and',
-      submissionTimestamp - maxTimestamp,
-      'seconds',
+      maxT,
+      'seconds (',
+      parseFloat((minT / 60).toFixed(2)),
+      'and',
+      parseFloat((maxT / 60).toFixed(2)),
+      'minutes)',
     )
   } catch (err) {
     console.error('An error occurred:', err)
@@ -260,7 +258,7 @@ export async function decodeOpStackSequencerBatch(
 
   const inflated = zlib.inflateSync(bytes)
 
-  // ----- reading decompressed data -----
+  // ----- reading decompressed data ----- This is RLP list w/out the header, so we need to add header
 
   reader = new BufferReader(inflated)
   const decompressedBytes = reader.readBytes(reader.left())
