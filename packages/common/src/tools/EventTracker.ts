@@ -48,10 +48,9 @@ export class EventTracker<T extends string> {
     const beginning = now - secondsBack * 1_000
     const sums = this.events
       .filter(({ timestamp }) => timestamp > beginning)
-      .reduce<Record<string, number>>(
-        (acc, { name }) => ({ ...acc, [name]: (acc[name] || 0) + 1 }),
-        {},
-      )
+      .reduce<
+        Record<string, number>
+      >((acc, { name }) => ({ ...acc, [name]: (acc[name] || 0) + 1 }), {})
     const averages = Object.entries(sums).reduce<Record<string, number>>(
       (acc, [name, count]) => ({
         ...acc,

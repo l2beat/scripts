@@ -1,0 +1,26 @@
+{
+  "name": "@l2beat/blob-downloader",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "format:fix": "prettier --write .",
+    "format": "prettier --check .",
+    "lint:fix": "yarn lint --fix",
+    "lint": "eslint --ext .ts --max-warnings 0 src",
+    "start": "node -r esbuild-register src",
+    "typecheck:ci": "yarn typecheck",
+    "typecheck": "tsc --noEmit",
+    "arb": "node -r esbuild-register src/arb.ts"
+  },
+  "dependencies": {
+    "@l2beat/backend-tools": "^0.5.1",
+    "@l2beat/common": "*",
+    "@l2beat/types": "*",
+    "@types/node-fetch": "^2.6.2",
+    "chalk": "^4.1.2",
+    "dotenv": "^16.0.1",
+    "ethers": "^5.7.2",
+    "node-fetch": "^2.6.7"
+  },
+  "devDependencies": {}
+}

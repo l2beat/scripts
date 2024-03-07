@@ -10,7 +10,7 @@ describe(AddressAnalyzer.name, () => {
       getCode: async () => '0x',
     })
     const etherscanClient = mock<EtherscanClient>({
-      getContractSource: async () => ({} as any),
+      getContractSource: async () => ({}) as any,
     })
     const addressAnalyzer = new AddressAnalyzer(provider, etherscanClient)
     const result = await addressAnalyzer.analyze(
@@ -25,7 +25,7 @@ describe(AddressAnalyzer.name, () => {
     })
     const etherscanClient = mock<EtherscanClient>({
       getContractSource: async () =>
-        ({ ABI: 'Contract source code not verified' } as any),
+        ({ ABI: 'Contract source code not verified' }) as any,
     })
     const addressAnalyzer = new AddressAnalyzer(provider, etherscanClient)
     const result = await addressAnalyzer.analyze(
@@ -44,7 +44,7 @@ describe(AddressAnalyzer.name, () => {
     })
     const etherscanClient = mock<EtherscanClient>({
       getContractSource: async () =>
-        ({ ABI: '[{"type":"string"}]', ContractName: 'Foo' } as any),
+        ({ ABI: '[{"type":"string"}]', ContractName: 'Foo' }) as any,
     })
     const addressAnalyzer = new AddressAnalyzer(provider, etherscanClient)
     const result = await addressAnalyzer.analyze(
