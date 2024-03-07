@@ -1,4 +1,4 @@
-export interface ProjectId extends String {
+export type ProjectId = string & {
   _ProjectIdBrand: string
 }
 

@@ -36,8 +36,8 @@ export class UnixTime {
       period === 'day'
         ? UnixTime.DAY
         : period === 'hour'
-        ? UnixTime.HOUR
-        : UnixTime.MINUTE
+          ? UnixTime.HOUR
+          : UnixTime.MINUTE
     return new UnixTime(this.timestamp - (this.timestamp % modulus))
   }
 
@@ -46,8 +46,8 @@ export class UnixTime {
       period === 'day'
         ? UnixTime.DAY
         : period === 'hour'
-        ? UnixTime.HOUR
-        : UnixTime.MINUTE
+          ? UnixTime.HOUR
+          : UnixTime.MINUTE
     const remaining = modulus - (this.timestamp % modulus)
     return new UnixTime(this.timestamp + remaining)
   }
@@ -57,10 +57,10 @@ export class UnixTime {
       period === 'day'
         ? UnixTime.DAY
         : period === 'hour'
-        ? UnixTime.HOUR
-        : period === 'minute'
-        ? UnixTime.MINUTE
-        : UnixTime.SIX_HOURS
+          ? UnixTime.HOUR
+          : period === 'minute'
+            ? UnixTime.MINUTE
+            : UnixTime.SIX_HOURS
     const isFull = this.timestamp % modulus ? false : true
     return isFull
   }
@@ -73,10 +73,10 @@ export class UnixTime {
       period === 'days'
         ? UnixTime.DAY
         : period === 'hours'
-        ? UnixTime.HOUR
-        : period === 'minutes'
-        ? UnixTime.MINUTE
-        : 1
+          ? UnixTime.HOUR
+          : period === 'minutes'
+            ? UnixTime.MINUTE
+            : 1
     return new UnixTime(this.timestamp + value * unit)
   }
 
